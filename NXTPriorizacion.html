@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Prioridad de familias de virus</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { --bg:#0f172a; --panel:#111827; --muted:#9ca3af; --txt:#e5e7eb; --accent:#22d3ee; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu; background:var(--bg); color:var(--txt); }
+    header { padding:20px 16px; border-bottom:1px solid #1f2937; }
+    header h1 { margin:0 0 4px; font-size:20px; }
+    header p { margin:0; color:var(--muted); font-size:14px; }
+    main { padding:16px; max-width:1300px; margin:0 auto; }
+    .card { background:var(--panel); border:1px solid #1f2937; border-radius:12px; padding:16px; }
+    .row { display:flex; flex-wrap:wrap; gap:16px; }
+    .col { flex:1 1 320px; }
+    label { font-size:14px; color:var(--muted); display:block; margin-bottom:6px; }
+    input[type="text"] {
+      width:100%; padding:10px 12px; border-radius:10px; border:1px solid #374151;
+      background:#0b1220; color:var(--txt); outline:none;
+    }
+    button {
+      margin-top:10px; padding:10px 14px; border-radius:10px; border:1px solid #164e63;
+      background:#0e7490; color:#e6fbff; cursor:pointer;
+    }
+    button:hover { filter:brightness(1.05); }
+    .grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-top:16px; }
+    .table-wrap { background:var(--panel); border:1px solid #1f2937; border-radius:12px; overflow:hidden; }
+    .table-wrap h3 { margin:0; padding:12px 14px; border-bottom:1px solid #1f2937; font-size:16px; text-align:center; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:10px 12px; border-bottom:1px solid #1f2937; font-size:14px; }
+    th { text-align:left; color:var(--muted); }
+    caption { caption-side:bottom; padding:10px 12px; color:var(--muted); font-size:12px; }
+    .msg { margin-top:10px; font-size:14px; color:#fca5a5; }
+    footer { padding:14px 16px; color:var(--muted); font-size:12px; text-align:center; }
+    @media (max-width:1100px){ .grid { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Prioridad de familias de virus</h1>
+    <p>Compare la “patogenicidad” relativa por nivel de prioridad. Orden: Alta &gt; Media &gt; Baja &gt; Sin riesgo &gt; No priorizada.</p>
+  </header>
+
+  <main>
+    <div class="card">
+      <div class="row">
+        <div class="col">
+          <label for="familia">Familia de virus</label>
+          <input id="familia" type="text" list="familias-list" placeholder="Ej.: orthomyxoviridae" />
+          <datalist id="familias-list"></datalist>
+          <button id="run">Ejecutar</button>
+          <div id="mensaje" class="msg" role="status" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="grid" style="margin-top:4px;">
+        <div class="table-wrap">
+          <h3>Más patógena que…</h3>
+          <table id="tabla-mas">
+            <thead><tr><th>Familia</th><th>Prioridad</th></tr></thead>
+            <tbody></tbody>
+            <caption>Familias con prioridad inferior a la introducida.</caption>
+          </table>
+        </div>
+
+        <div class="table-wrap">
+          <h3>Tan patógena como…</h3>
+          <table id="tabla-igual">
+            <thead><tr><th>Familia</th><th>Prioridad</th></tr></thead>
+            <tbody></tbody>
+            <caption>Familias con la misma prioridad (excluida la propia).</caption>
+          </table>
+        </div>
+
+        <div class="table-wrap">
+          <h3>Menos patógena que…</h3>
+          <table id="tabla-menos">
+            <thead><tr><th>Familia</th><th>Prioridad</th></tr></thead>
+            <tbody></tbody>
+            <caption>Familias con prioridad superior a la introducida.</caption>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>Fuente: mapeo interno basado en categorías públicas de riesgo. Use con criterio.</footer>
+
+  <script>
+    const prioridadFamilias = {
+      "adenoviridae":"Media",
+      "anelloviridae":"Baja",
+      "arenaviridae":"Alta",
+      "astroviridae":"Baja",
+      "bacteria":"Alta",
+      "bornaviridae":"Baja",
+      "coronaviridae":"Alta",
+      "filoviridae":"Alta",
+      "flaviviridae":"Alta",
+      "hantaviridae":"Alta",
+      "hepadnaviridae":"Baja",
+      "hepeviridae":"Baja",
+      "herpesviridae":"Baja",
+      "nairoviridae":"Alta",
+      "orthomyxoviridae":"Alta",
+      "papillomaviridae":"Baja",
+      "paramyxoviridae":"Alta",
+      "parvoviridae":"Baja",
+      "peribunyaviridae":"Baja",
+      "phenuiviridae":"Alta",
+      "picobirnaviridae":"Baja",
+      "picornaviridae":"Media",
+      "pneumoviridae":"Media",
+      "polyomaviridae":"Baja",
+      "poxviridae":"Alta",
+      "retroviridae":"Media",
+      "rhabdoviridae":"Baja",
+      "sedoreoviridae":"Baja",
+      "spinareoviridae":"Baja",
+      "togaviridae":"Alta",
+      "arteriviridae":"Sin riesgo"
+    };
+
+    const score = { "No priorizada":-1, "Sin riesgo":0, "Baja":1, "Media":2, "Alta":3 };
+
+    const dl = document.getElementById('familias-list');
+    Object.keys(prioridadFamilias).sort().forEach(k=>{
+      const opt = document.createElement('option'); opt.value = k; dl.appendChild(opt);
+    });
+
+    const familiaInput = document.getElementById('familia');
+    const runBtn = document.getElementById('run');
+    const msg = document.getElementById('mensaje');
+    const tMas = document.querySelector('#tabla-mas tbody');
+    const tMenos = document.querySelector('#tabla-menos tbody');
+    const tIgual = document.querySelector('#tabla-igual tbody');
+
+    function normalizaClave(txt){
+      if(!txt) return "";
+      let k = txt.trim().toLowerCase();
+      if(k === "bacterias") k = "bacteria";
+      return k;
+    }
+
+    function clasificarFamilia(k){
+      const clave = normalizaClave(k);
+      return prioridadFamilias[clave] ?? "No priorizada";
+    }
+
+    function limpiarTablas(){
+      tMas.innerHTML = "";
+      tMenos.innerHTML = "";
+      tIgual.innerHTML = "";
+    }
+
+    function fila(familia, prioridad){
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td');
+      const td2 = document.createElement('td');
+      td1.textContent = familia;
+      td2.textContent = prioridad;
+      tr.appendChild(td1); tr.appendChild(td2);
+      return tr;
+    }
+
+    function ejecutar(){
+      msg.textContent = "";
+      limpiarTablas();
+
+      const entrada = familiaInput.value;
+      if(!entrada || !entrada.trim()){
+        msg.textContent = "Introduzca una familia.";
+        return;
+      }
+
+      const clave = normalizaClave(entrada);
+      const prioridad = clasificarFamilia(clave);
+      const sRef = score[prioridad];
+
+      if(prioridad === "No priorizada"){
+        msg.textContent = `“${entrada.trim()}” no está en la lista. Se usa valor “No priorizada”.`;
+      }
+
+      const mas = [];
+      const menos = [];
+      const igual = [];
+
+      Object.entries(prioridadFamilias).forEach(([fam, pri])=>{
+        if(fam === clave) return;
+        const s = score[pri];
+        if(sRef > s){ mas.push([fam, pri]); }
+        else if(sRef < s){ menos.push([fam, pri]); }
+        else { igual.push([fam, pri]); }
+      });
+
+      const byPriDesc = (a,b)=> score[b[1]] - score[a[1]] || a[0].localeCompare(b[0]);
+
+      mas.sort(byPriDesc).forEach(([fam, pri])=> tMas.appendChild(fila(fam, pri)));
+      menos.sort(byPriDesc).forEach(([fam, pri])=> tMenos.appendChild(fila(fam, pri)));
+      igual.sort((a,b)=> a[0].localeCompare(b[0])).forEach(([fam, pri])=> tIgual.appendChild(fila(fam, pri)));
+
+      if(!mas.length) tMas.appendChild(fila("—", "—"));
+      if(!menos.length) tMenos.appendChild(fila("—", "—"));
+      if(!igual.length) tIgual.appendChild(fila("—", "—"));
+    }
+
+    runBtn.addEventListener('click', ejecutar);
+    familiaInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') ejecutar(); });
+  </script>
+</body>
+</html>
